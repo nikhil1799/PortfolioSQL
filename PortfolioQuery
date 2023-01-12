@@ -1,0 +1,135 @@
+SELECT [location], [date], total_cases,total_deaths,CAST(total_deaths AS float) / CAST(total_cases AS float)*100 AS "Death-Case Percentage"
+FROM Portfolio_One..CovidDeathsUpdate
+WHERE [location] like '%canada%'
+ORDER BY 1,2
+--
+
+
+SELECT [location], [date], total_cases,total_deaths,CAST(total_cases AS float) / CAST(population AS float)*100 AS "Percentage of Total Cases"
+FROM Portfolio_One..CovidDeathsUpdate
+WHERE [location] like '%canada%'
+ORDER BY 1,2
+
+--
+
+
+select [location], population, MAX(total_cases), MAX(CAST(total_cases AS float) / CAST(population AS float)*100) as 'Infection Rate'
+from Portfolio_One..CovidDeathsUpdate
+GROUP BY [location], population
+ORDER by [Infection Rate]
+
+
+
+--
+
+select [location], MAX(total_deaths) as 'Highest Death Count', MAX(CAST(total_deaths AS float) / CAST(population AS float))*100 as 'Death Rate by Country'
+from Portfolio_One..CovidDeathsUpdate
+WHERE continent is not NULL 
+GROUP BY [location]
+
+ORDER by [Death Rate by Country] DESC
+
+
+
+--
+
+
+select [location] as 'Continent', MAX(total_deaths) as 'Highest Death Count', MAX(CAST(total_deaths AS float) / CAST(population AS float))*100 as 'Death Rate by Continent'
+from Portfolio_One..CovidDeathsUpdate
+WHERE (continent is NULL) and ([location] <> 'High income')  and ([location] <> 'Low income')  and ([location] <> 'Upper middle income')  and ([location] <> 'Lower middle income')  and ([location] <> 'European Union')  and ([location] <> 'International')
+GROUP BY [location]
+ORDER by [Death Rate by Continent] DESC
+
+
+--
+
+
+SELECT [date], SUM(new_cases) as 'Global Cases per Day', SUM(new_deaths) as 'Global Deaths per Day', SUM(CAST(new_deaths AS float))/ SUM(CAST(new_cases AS float))*100 as 'Global Death Percentage'
+from Portfolio_One..CovidDeathsUpdate
+WHERE continent is not null
+GROUP by [date]
+ORDER by 1,2
+
+--
+
+
+SELECT dt.continent, dt.[date], dt.[location], dt.population, vac.new_vaccinations
+FROM Portfolio_One..CovidDeathsUpdate dt 
+    JOIN Portfolio_One..CovidVaccines vac 
+        on dt.[location] = vac.[location]
+        and dt.[date] = vac.[date]
+
+WHERE dt.continent is not NULL
+ORDER by 2,3
+
+
+--
+
+WITH PopulationvsVaccinations (Continent, Location, date, population, new_vaccinations, RollingTotalVaccinations)
+as
+(
+SELECT dt.continent, dt.[location], dt.[date],  dt.population, vac.new_vaccinations, SUM(vac.new_vaccinations) OVER (Partition by dt.location order by dt.location, dt.date) as RollingTotalVaccinations
+FROM Portfolio_One..CovidDeathsUpdate dt 
+    JOIN Portfolio_One..CovidVaccines vac 
+        on dt.[location] = vac.[location]
+        and dt.[date] = vac.[date]
+
+WHERE dt.continent is not NULL
+    
+
+)
+SELECT*, (CAST(RollingTotalVaccinations as float)/CAST(population as float)*100) as RollingPopulationVaccinated
+FROM PopulationvsVaccinations
+
+
+---
+
+
+
+
+DROP TABLE if EXISTS #PopulationVaccinated
+CREATE TABLE #PopulationVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date DATETIME,
+Population NUMERIC,
+new_vaccinations Numeric,
+RollingTotalVaccinations FLOAT
+
+
+
+)
+
+INSERT into #PopulationVaccinated
+
+SELECT dt.continent, dt.[location], dt.[date],  dt.population, vac.new_vaccinations, SUM(vac.new_vaccinations) OVER (Partition by dt.location order by dt.location, dt.date) as RollingTotalVaccinations
+FROM Portfolio_One..CovidDeathsUpdate dt 
+    JOIN Portfolio_One..CovidVaccines vac 
+        on dt.[location] = vac.[location]
+        and dt.[date] = vac.[date]
+
+WHERE dt.continent is not NULL
+    
+
+
+SELECT*, (CAST(RollingTotalVaccinations as float)/CAST(population as float)*100) as 'Percent Population Vaccinated'
+FROM #PopulationVaccinated
+
+GO
+
+Create VIEW PopulationVaccinated 
+as
+SELECT dt.continent, dt.[location], dt.[date],  dt.population, vac.new_vaccinations, SUM(vac.new_vaccinations) OVER (Partition by dt.location order by dt.location, dt.date) as RollingTotalVaccinations
+FROM Portfolio_One..CovidDeathsUpdate dt 
+    JOIN Portfolio_One..CovidVaccines vac 
+        on dt.[location] = vac.[location]
+        and dt.[date] = vac.[date]
+
+--WHERE dt.continent is not NULL
+
+
+
+
+
+
